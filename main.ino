@@ -2,13 +2,13 @@
 #include <HTTPClient.h>
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
-#include <Keypad.h>
 #include <ESP32Servo.h> 
 #include <VL53L0X.h>
+#include <Keypad.h>
 
 // ================= WIFI =================
-const char* ssid = "Sakib";
-const char* password = "123456789";
+const char* ssid = "hello123";
+const char* password = "hello123";
 String serverURL = "https://smart-parking-backend-u47b.onrender.com/api/parking/verify";
 
 // ================= LCD =================
@@ -25,17 +25,18 @@ const int servoPin = 18;
 // ================= TOF SENSOR =================
 VL53L0X sensor;
 
-// ================= KEYPAD =================
-const byte ROWS = 4;
-const byte COLS = 4;
+// ================= KEYPAD SETUP =================
+const byte ROWS = 4; 
+const byte COLS = 4; 
 char keys[ROWS][COLS] = {
   {'1','2','3','A'},
   {'4','5','6','B'},
   {'7','8','9','C'},
   {'*','0','#','D'}
 };
-byte rowPins[ROWS] = {32, 33, 25, 26};
-byte colPins[COLS] = {27, 14, 12, 13};
+
+byte rowPins[ROWS] = {32, 33, 25, 26}; 
+byte colPins[COLS] = {27, 14, 12, 13}; 
 
 Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
 
@@ -64,13 +65,12 @@ String getVehicleType() {
   
   float cm = distance / 10.0;
   
-  // Explicitly print the raw sensor value as requested
   Serial.print("RAW DISTANCE: "); Serial.print(distance); Serial.println(" mm");
   Serial.print("CALCULATED HEIGHT: "); Serial.print(cm); Serial.println(" cm");
 
   if (cm <= 3.0) return "bike";
-  if (cm <= 5.0) return "car";
-  if (cm <= 8.0) return "bus";
+  if (cm <= 13.0) return "car";
+  if (cm <= 20.0) return "bus";
   return "unknown";
 }
 
@@ -139,7 +139,7 @@ void setup() {
   sensor.setTimeout(500);
 
   WiFi.begin(ssid, password);
-  lcd.print("WiFi: "); lcd.print(ssid);
+  lcd.print("WiFi Connecting");
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
@@ -152,7 +152,6 @@ void setup() {
 void loop() {
   long distance = readUltrasonic();
 
-  // If vehicle detected within 10cm
   if (distance > 0 && distance < 10) { 
     Serial.print("Ultrasonic Trigger: "); Serial.print(distance); Serial.println(" cm");
     lcd.clear();
@@ -160,37 +159,41 @@ void loop() {
     delay(1000);
     lcd.clear();
     lcd.print("Enter OTP:");
-    lcd.setCursor(0, 1); // Set cursor to second line for OTP entry
+    lcd.setCursor(0, 1);
     
     otp = "";
+    String maskedOtp = ""; // To show '*' on screen
     bool submitted = false;
     unsigned long startTime = millis();
 
+    // Loop for 30 seconds to capture keypad input
     while (millis() - startTime < 30000) {
       char key = keypad.getKey();
+      
       if (key) {
-        // Clear Function (C or * can be used depending on your keypad markings)
-        if (key == 'C' || key == '*') {
+        // 'C' is not on your 4x4 layout, so '*' or 'A/B/C/D' can be used. 
+        // Based on your prompt, I'm using '*' as Clear (C) and '#' as Submit.
+        if (key == '*' || key == 'C') { 
           otp = "";
-          lcd.clear();
-          lcd.print("Enter OTP:");
+          maskedOtp = "";
           lcd.setCursor(0, 1);
-          Serial.println("OTP Cleared");
+          lcd.print("                "); // Clear line
+          lcd.setCursor(0, 1);
+          Serial.println("Input Cleared");
         } 
-        // Submit Function
-        else if (key == '#' && otp.length() >= 4) { 
-          Serial.println("OTP Submitted: " + otp);
-          submitted = true;
-          break;
+        else if (key == '#') {
+          if (otp.length() > 0) {
+            Serial.println("OTP Submitted: " + otp);
+            submitted = true;
+            break;
+          }
         } 
-        // Number Input
-        else if (isdigit(key) && otp.length() < 6) {
+        else if (isdigit(key)) { // Only accept numbers
           otp += key;
-          lcd.setCursor(0, 1); 
-          lcd.print("      "); // Clear the line area
+          maskedOtp += "*";
           lcd.setCursor(0, 1);
-          lcd.print(otp);      // Show the actual digits
-          Serial.print("Input: "); Serial.println(otp);
+          lcd.print(maskedOtp);
+          Serial.print("Key Pressed: "); Serial.println(key);
         }
       }
     }
@@ -198,12 +201,12 @@ void loop() {
     if (submitted) {
       lcd.clear();
       lcd.print("Verifying...");
-      String type = getVehicleType(); // This will now print raw sensor values
+      String type = getVehicleType(); 
       sendToServer(otp, type);
     } else {
       lcd.clear();
       lcd.print("Timed Out");
-      Serial.println("User timed out.");
+      Serial.println("User timed out (No input received).");
     }
     
     delay(3000);
