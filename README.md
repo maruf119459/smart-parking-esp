@@ -222,5 +222,3 @@ GET /api/parking/verify?oneTimeKey=12345&vehicleType=car
 
 **Md. Mohiuddin Maruf**
 
-* Create **system architecture diagram**
-* Add **API documentation (Swagger style)**
